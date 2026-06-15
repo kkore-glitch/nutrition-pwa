@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f7f4ef">
+    <meta name="description" content="手機用飲食營養紀錄 PWA">
+    <title>飲控幫手</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./src/styles.css?v=4">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="app-header">
+        <div>
+          <h1>飲控幫手 <span id="taiwanClock" class="clock">--</span></h1>
+          <p id="weekRange" class="subline">本週統計</p>
+        </div>
+        <button id="themeToggle" class="icon-button" type="button" aria-label="切換深色模式" title="切換深色模式">◐</button>
+      </header>
+
+      <main>
+        <section id="tab-overview" class="tab-panel is-active" aria-labelledby="nav-overview">
+          <div id="emptyWeekNotice" class="empty-banner is-hidden">沒有資料</div>
+
+          <section class="panel macro-panel">
+            <div class="panel-head">
+              <div>
+                <h2>營養比例</h2>
+                <p>本週碳水、蛋白質、脂肪</p>
+              </div>
+            </div>
+            <div class="macro-layout">
+              <canvas id="macroChart" width="220" height="220" aria-label="營養比例圓餅圖"></canvas>
+              <div class="target-editor">
+                <label>碳水目標 %
+                  <input id="targetCarbs" type="number" inputmode="decimal" min="0" max="100" step="1">
+                </label>
+                <label>蛋白質目標 %
+                  <input id="targetProtein" type="number" inputmode="decimal" min="0" max="100" step="1">
+                </label>
+                <label>脂肪目標 %
+                  <input id="targetFat" type="number" inputmode="decimal" min="0" max="100" step="1">
+                </label>
+              </div>
+            </div>
+            <div id="macroStats" class="macro-stats"></div>
+          </section>
+
+          <section class="panel metric-grid">
+            <div class="metric-card">
+              <h2>平均每日總熱量</h2>
+              <strong id="avgCalories">0 kcal</strong>
+              <label>基礎代謝率
+                <input id="bmrInput" type="number" inputmode="decimal" min="0" step="10" placeholder="例如 1500">
+              </label>
+              <p id="calorieDiff" class="metric-note">差值 0 kcal</p>
+            </div>
+            <div class="metric-card">
+              <h2>當日鈉含量</h2>
+              <strong id="todaySodium">0 mg</strong>
+              <p id="sodiumStatus" class="metric-note">建議攝取量 2400/日</p>
+            </div>
+          </section>
+
+          <section class="panel ai-panel">
+            <div class="panel-head">
+              <div>
+                <h2>AI 建言</h2>
+                <p>依前一天紀錄與本週目標產生簡短建議</p>
+              </div>
+              <button id="aiSettingsToggle" class="text-button" type="button">API 設定</button>
+            </div>
+            <div id="aiSettings" class="ai-settings is-hidden">
+              <label>OpenAI API key
+                <input id="apiKeyInput" type="password" autocomplete="off" placeholder="sk-...">
+              </label>
+              <label>模型
+                <input id="modelInput" type="text" autocomplete="off" value="gpt-5.4-mini">
+              </label>
+              <p>靜態網頁無後端，金鑰會存在這台裝置的瀏覽器。不要把金鑰寫進 repo。</p>
+            </div>
+            <textarea id="aiAdvice" rows="6" readonly placeholder="按下 AI 建言後，這裡會顯示結果。"></textarea>
+            <button id="askAiButton" class="primary-button" type="button">AI 建言</button>
+          </section>
+        </section>
+
+        <section id="tab-log" class="tab-panel" aria-labelledby="nav-log">
+          <section class="panel record-panel">
+            <button id="datePickerButton" class="date-button" type="button">
+              <span id="selectedDateLabel">今天</span>
+              <small>點選日期</small>
+            </button>
+            <div id="dailySummary" class="daily-summary"></div>
+            <div id="logList" class="log-list"></div>
+            <button id="addLogButton" class="primary-button floating-action" type="button">新增已吃食物</button>
+          </section>
+        </section>
+
+        <section id="tab-cards" class="tab-panel" aria-labelledby="nav-cards">
+          <section class="panel cards-panel">
+            <div class="panel-head">
+              <div>
+                <h2>卡片區</h2>
+                <p>常吃品項與營養成分</p>
+              </div>
+              <button id="addCardButton" class="primary-button compact" type="button">新增卡片</button>
+            </div>
+            <div id="foodCardList" class="food-card-list"></div>
+          </section>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="主要頁籤">
+        <button id="nav-overview" class="nav-item is-active" type="button" data-tab="overview">概覽</button>
+        <button id="nav-log" class="nav-item" type="button" data-tab="log">飲食紀錄</button>
+        <button id="nav-cards" class="nav-item" type="button" data-tab="cards">卡片區</button>
+      </nav>
+    </div>
+
+    <div id="modalLayer" class="modal-layer is-hidden" role="presentation"></div>
+    <template id="cardFormTemplate">
+      <form class="modal-card form-stack" data-card-form>
+        <div class="modal-head">
+          <h2 data-modal-title>新增卡片</h2>
+          <button class="icon-button" type="button" data-close-modal aria-label="關閉" title="關閉">×</button>
+        </div>
+        <label>品項名稱
+          <input name="name" required autocomplete="off" placeholder="例如 雞胸便當">
+        </label>
+        <div class="two-col">
+          <label>熱量 kcal
+            <input name="calories" type="number" inputmode="decimal" min="0" step="1" required>
+          </label>
+          <label>鈉 mg
+            <input name="sodium" type="number" inputmode="decimal" min="0" step="1" required>
+          </label>
+        </div>
+        <div class="three-col">
+          <label>碳水 g
+            <input name="carbs" type="number" inputmode="decimal" min="0" step="0.1" required>
+          </label>
+          <label>蛋白質 g
+            <input name="protein" type="number" inputmode="decimal" min="0" step="0.1" required>
+          </label>
+          <label>脂肪 g
+            <input name="fat" type="number" inputmode="decimal" min="0" step="0.1" required>
+          </label>
+        </div>
+        <label>備註
+          <textarea name="note" rows="3" placeholder="店家、份量或替換方式"></textarea>
+        </label>
+        <button class="primary-button" type="submit">儲存</button>
+      </form>
+    </template>
+    <script src="./src/app.js?v=4" defer></script>
+  </body>
+</html>
