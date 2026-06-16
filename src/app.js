@@ -23,6 +23,7 @@ const defaultState = {
 };
 
 let state = loadState();
+let macroView = "daily";
 let activeTaiwanDate = taiwanYmd(new Date());
 if (state.selectedDate !== activeTaiwanDate) {
   state.selectedDate = activeTaiwanDate;
@@ -41,7 +42,8 @@ function bindElements() {
   [
     "taiwanClock", "weekRange", "themeToggle", "emptyWeekNotice",
     "macroChart", "macroStats", "targetCarbs", "targetProtein", "targetFat",
-    "bmrInput", "todayCalories", "calorieDiff", "todaySodium", "sodiumStatus",
+    "bmrInput", "macroCaloriesTitle", "macroCalories", "calorieDiff", "macroSodiumTitle", "macroSodium", "sodiumStatus",
+    "macroDailyButton", "macroWeeklyButton",
     "aiSettingsToggle", "aiSettings", "apiKeyInput", "modelInput", "aiAdvice",
     "askAiButton", "selectedDateLabel", "datePickerButton", "dailySummary",
     "logList", "addLogButton", "importCardButton", "addCardButton", "foodCardList", "modalLayer"
@@ -66,6 +68,12 @@ function initApp() {
 function bindEvents() {
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => setTab(button.dataset.tab));
+  });
+  document.querySelectorAll("[data-macro-view]").forEach((button) => {
+    button.addEventListener("click", () => {
+      macroView = button.dataset.macroView;
+      renderOverview();
+    });
   });
 
   els.themeToggle.addEventListener("click", () => {
@@ -128,32 +136,56 @@ function render() {
 function renderOverview() {
   const week = getWeekRange(new Date());
   const weekLogs = state.logs.filter((log) => log.date >= week.start && log.date <= week.end);
-  const hasData = weekLogs.length > 0;
-  els.weekRange.textContent = `${formatDateShort(week.start)} - ${formatDateShort(week.end)}`;
-  els.emptyWeekNotice.classList.toggle("is-hidden", hasData);
-  document.querySelectorAll("#tab-overview .panel").forEach((panel) => {
-    panel.classList.toggle("is-muted", !hasData);
-  });
-
-  const totals = totalLogs(weekLogs);
-  const datesWithLogs = new Set(weekLogs.map((log) => log.date));
-  const avg = hasData ? totals.calories / Math.max(datesWithLogs.size, 1) : 0;
-  drawMacroChart(totals, hasData, avg);
-  renderMacroStats(totals, hasData);
-
   const todayLogs = state.logs.filter((log) => log.date === taiwanYmd(new Date()));
-  const todayTotals = totalLogs(todayLogs);
-  els.todayCalories.textContent = `${round(todayTotals.calories, 0)} kcal`;
+  els.weekRange.textContent = `${formatDateShort(week.start)} - ${formatDateShort(week.end)}`;
+  const viewData = getMacroViewData(todayLogs, weekLogs);
+  els.emptyWeekNotice.classList.toggle("is-hidden", viewData.hasData);
+  document.querySelectorAll("#tab-overview .panel").forEach((panel) => {
+    panel.classList.toggle("is-muted", !viewData.hasData);
+  });
+  els.macroDailyButton.classList.toggle("is-active", macroView === "daily");
+  els.macroWeeklyButton.classList.toggle("is-active", macroView === "weekly");
+
+  drawMacroChart(viewData.totals, viewData.hasData, viewData.totals.calories);
+  renderMacroStats(viewData.totals, viewData.hasData);
+
+  els.macroCaloriesTitle.textContent = viewData.calorieTitle;
+  els.macroCalories.textContent = `${round(viewData.totals.calories, 0)} kcal`;
+  els.macroSodiumTitle.textContent = viewData.sodiumTitle;
+  els.macroSodium.textContent = `${round(viewData.totals.sodium, 0)} mg`;
 
   const bmr = Number(state.settings.bmr || 0);
-  const diff = todayTotals.calories - bmr;
+  const diff = viewData.totals.calories - bmr;
   els.calorieDiff.textContent = bmr ? `差值 ${signed(round(diff, 0))} kcal` : "輸入基礎代謝率後計算差值";
   els.calorieDiff.classList.toggle("over", bmr > 0 && diff > 0);
   els.calorieDiff.classList.toggle("under", bmr > 0 && diff < 0);
 
-  els.todaySodium.textContent = `${round(todayTotals.sodium, 0)} mg`;
-  els.sodiumStatus.textContent = todayTotals.sodium > 2000 ? "超過 2000 mg，建議攝取量 2400/日" : "建議攝取量 2400/日";
-  els.sodiumStatus.classList.toggle("over", todayTotals.sodium > 2000);
+  els.sodiumStatus.textContent = viewData.totals.sodium > 2000 ? "超過 2000 mg，建議攝取量 2400/日" : "建議攝取量 2400/日";
+  els.sodiumStatus.classList.toggle("over", viewData.totals.sodium > 2000);
+}
+
+function getMacroViewData(todayLogs, weekLogs) {
+  if (macroView === "weekly") {
+    const totals = totalLogs(weekLogs);
+    const recordedDays = Math.max(new Set(weekLogs.map((log) => log.date)).size, 1);
+    return {
+      hasData: weekLogs.length > 0,
+      totals: divideTotals(totals, recordedDays),
+      calorieTitle: "本週平均熱量",
+      sodiumTitle: "本週平均鈉攝取"
+    };
+  }
+
+  return {
+    hasData: todayLogs.length > 0,
+    totals: totalLogs(todayLogs),
+    calorieTitle: "本日攝取熱量",
+    sodiumTitle: "本日鈉攝取"
+  };
+}
+
+function divideTotals(totals, divisor) {
+  return Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, value / divisor]));
 }
 
 function renderMacroStats(totals, hasData) {

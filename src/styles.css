@@ -219,6 +219,35 @@ h2 {
   align-items: center;
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.segment-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 820;
+}
+
+.segment-button.is-active {
+  background: var(--surface);
+  color: var(--brand-strong);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+.macro-metrics {
+  margin-bottom: 14px;
+}
+
 #macroChart {
   width: min(220px, 100%);
   height: auto;

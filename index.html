@@ -7,7 +7,7 @@
     <meta name="description" content="手機用飲食營養紀錄 PWA">
     <title>飲控幫手</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./src/styles.css?v=8">
+    <link rel="stylesheet" href="./src/styles.css?v=9">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -23,27 +23,30 @@
         <section id="tab-overview" class="tab-panel is-active" aria-labelledby="nav-overview">
           <div id="emptyWeekNotice" class="empty-banner is-hidden">沒有資料</div>
 
-          <section class="panel metric-grid">
-            <div class="metric-card">
-              <h2>本日攝取熱量</h2>
-              <strong id="todayCalories">0 kcal</strong>
-              <label>基礎代謝率
-                <input id="bmrInput" type="number" inputmode="decimal" min="0" step="10" placeholder="例如 1500">
-              </label>
-              <p id="calorieDiff" class="metric-note">差值 0 kcal</p>
-            </div>
-            <div class="metric-card">
-              <h2>本日鈉攝取</h2>
-              <strong id="todaySodium">0 mg</strong>
-              <p id="sodiumStatus" class="metric-note">建議攝取量 2400/日</p>
-            </div>
-          </section>
-
           <section class="panel macro-panel">
             <div class="panel-head">
               <div>
                 <h2>營養比例</h2>
-                <p>本週碳水、蛋白質、脂肪</p>
+                <p>本日與本週平均攝取</p>
+              </div>
+              <div class="segmented-control" aria-label="營養比例切換">
+                <button id="macroDailyButton" class="segment-button is-active" type="button" data-macro-view="daily">本日</button>
+                <button id="macroWeeklyButton" class="segment-button" type="button" data-macro-view="weekly">本週平均</button>
+              </div>
+            </div>
+            <div class="metric-grid macro-metrics">
+              <div class="metric-card">
+                <h2 id="macroCaloriesTitle">本日攝取熱量</h2>
+                <strong id="macroCalories">0 kcal</strong>
+                <label>基礎代謝率
+                  <input id="bmrInput" type="number" inputmode="decimal" min="0" step="10" placeholder="例如 1500">
+                </label>
+                <p id="calorieDiff" class="metric-note">差值 0 kcal</p>
+              </div>
+              <div class="metric-card">
+                <h2 id="macroSodiumTitle">本日鈉攝取</h2>
+                <strong id="macroSodium">0 mg</strong>
+                <p id="sodiumStatus" class="metric-note">建議攝取量 2400/日</p>
               </div>
             </div>
             <div class="macro-layout">
@@ -156,6 +159,6 @@
         <button class="primary-button" type="submit">儲存</button>
       </form>
     </template>
-    <script src="./src/app.js?v=8" defer></script>
+    <script src="./src/app.js?v=9" defer></script>
   </body>
 </html>

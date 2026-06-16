@@ -1,9 +1,9 @@
-const CACHE_NAME = "drink-control-helper-v8";
+const CACHE_NAME = "drink-control-helper-v9";
 const ASSETS = [
   "./",
   "./index.html",
-  "./src/styles.css?v=8",
-  "./src/app.js?v=8",
+  "./src/styles.css?v=9",
+  "./src/app.js?v=9",
   "./manifest.webmanifest",
   "./icons/icon-192.svg",
   "./icons/icon-512.svg"
