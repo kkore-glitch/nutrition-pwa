@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --bottom-nav-height: calc(66px + env(safe-area-inset-bottom));
   --bg: #f7f4ef;
   --surface: #ffffff;
   --surface-soft: #f0ece5;
@@ -48,6 +49,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -63,7 +65,7 @@ button {
 
 .app-shell {
   min-height: 100dvh;
-  padding: max(18px, env(safe-area-inset-top)) 16px calc(92px + env(safe-area-inset-bottom));
+  padding: max(18px, env(safe-area-inset-top)) 16px calc(var(--bottom-nav-height) + 18px);
   max-width: 760px;
   margin: 0 auto;
 }
@@ -345,8 +347,10 @@ textarea:focus {
 
 .record-panel {
   min-height: calc(100dvh - 188px);
-  position: relative;
-  padding-bottom: 78px;
+}
+
+.record-top-action {
+  margin-bottom: 12px;
 }
 
 .date-button {
@@ -508,28 +512,24 @@ textarea:focus {
   color: var(--danger);
 }
 
-.floating-action {
-  position: absolute;
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-  width: auto;
-}
-
 .bottom-nav {
   position: fixed;
   left: 50%;
   bottom: 0;
   z-index: 15;
   width: min(760px, 100%);
+  height: var(--bottom-nav-height);
   transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  align-items: center;
   gap: 8px;
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--bg), transparent 6%);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transform-style: preserve-3d;
 }
 
 .nav-item {

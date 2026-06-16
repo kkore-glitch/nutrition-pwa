@@ -129,11 +129,11 @@ function renderOverview() {
   });
 
   const totals = totalLogs(weekLogs);
-  drawMacroChart(totals, hasData);
-  renderMacroStats(totals, hasData);
-
   const datesWithLogs = new Set(weekLogs.map((log) => log.date));
   const avg = hasData ? totals.calories / Math.max(datesWithLogs.size, 1) : 0;
+  drawMacroChart(totals, hasData, avg);
+  renderMacroStats(totals, hasData);
+
   els.avgCalories.textContent = `${round(avg, 0)} kcal`;
 
   const bmr = Number(state.settings.bmr || 0);
@@ -174,7 +174,7 @@ function renderMacroStats(totals, hasData) {
   });
 }
 
-function drawMacroChart(totals, hasData) {
+function drawMacroChart(totals, hasData, averageCalories) {
   const canvas = els.macroChart;
   const ctx = canvas.getContext("2d");
   const size = canvas.width;
@@ -217,7 +217,7 @@ function drawMacroChart(totals, hasData) {
   ctx.font = "800 18px -apple-system, BlinkMacSystemFont, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(`${round(totals.calories, 0)} kcal`, center, center);
+  ctx.fillText(`${round(averageCalories, 0)} kcal`, center, center);
 }
 
 function renderLog() {
@@ -560,7 +560,7 @@ async function askAiAdvice() {
         input: [
           {
             role: "developer",
-            content: "你是飲食紀錄分析助手。只根據使用者提供的營養紀錄回答。用繁體中文，150字內，語氣理性。回覆順序固定：第一句先判讀 overview 的整體比例、熱量差值與鈉；第二句用 analysisDay 當例子提出一個具體調整或維持建議。若 overview 某項偏高，但 analysisDay 同項沒有偏高，不要硬把當日食物當原因；改說需要再觀察其他日期。不要給醫療診斷。"
+            content: "你是飲食紀錄分析助手。只根據使用者提供的營養紀錄回答。用繁體中文，150字內，語氣理性。回覆順序固定：第一句先判讀 overview 的整體比例、熱量差值與當日鈉；第二句用 analysisDay 當例子提出一個具體調整或維持建議。鈉只可引用 overview.sodiumToday，資料中沒有週鈉合計。若 overview 某項偏高，但 analysisDay 同項沒有偏高，不要硬把當日食物當原因；改說需要再觀察其他日期。不要給醫療診斷。"
           },
           {
             role: "user",
@@ -594,7 +594,12 @@ function buildNutritionOverview(totals, logs, targetRatio) {
   const sodiumToday = totalLogs(todayLogs).sodium;
   const ratio = macroRatio(totals);
   return {
-    totals,
+    macroTotals: {
+      calories: totals.calories,
+      carbs: totals.carbs,
+      protein: totals.protein,
+      fat: totals.fat
+    },
     macroRatio: ratio,
     macroStatus: macroStatus(ratio, targetRatio),
     averageCalories,
