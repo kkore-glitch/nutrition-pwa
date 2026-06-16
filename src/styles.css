@@ -206,6 +206,12 @@ h2 {
   padding: 9px 12px;
 }
 
+.secondary-button.compact {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 9px 12px;
+}
+
 .macro-layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -407,17 +413,28 @@ textarea:focus {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--danger), transparent 82%);
+  background: var(--surface-soft);
+}
+
+.row-delete,
+.row-copy {
+  position: absolute;
+  width: 92px;
+  height: 100%;
+  border: 0;
+  font-weight: 850;
 }
 
 .row-delete {
-  position: absolute;
   inset: 0 0 0 auto;
-  width: 92px;
-  border: 0;
   background: var(--danger);
   color: #fff;
-  font-weight: 850;
+}
+
+.row-copy {
+  inset: 0 auto 0 0;
+  background: var(--brand);
+  color: #fff;
 }
 
 .row-surface,
@@ -437,8 +454,12 @@ textarea:focus {
   transition: transform 180ms ease;
 }
 
-.log-row.is-open .row-surface {
+.log-row.is-delete-open .row-surface {
   transform: translateX(-92px);
+}
+
+.log-row.is-copy-open .row-surface {
+  transform: translateX(92px);
 }
 
 .row-title,
@@ -492,7 +513,8 @@ textarea:focus {
 }
 
 .food-card-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -505,6 +527,39 @@ textarea:focus {
   background: var(--surface-soft);
   color: var(--text);
   font-weight: 760;
+}
+
+.head-actions,
+.modal-actions,
+.modal-button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.head-actions {
+  flex: 0 0 auto;
+}
+
+.modal-actions {
+  align-items: end;
+}
+
+.modal-actions .text-button {
+  min-height: 43px;
+}
+
+.modal-button-row .primary-button,
+.modal-button-row .secondary-button {
+  flex: 1;
+}
+
+.import-preview {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
 }
 
 .danger-button {
@@ -647,7 +702,7 @@ textarea:focus {
 
 .servings-row {
   display: grid;
-  grid-template-columns: 1fr 96px;
+  grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: end;
   margin-bottom: 14px;

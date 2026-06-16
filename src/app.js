@@ -1,4 +1,5 @@
 const STORAGE_KEY = "nutritionPwaState.v1";
+const CARD_CODE_PREFIX = "NUTRI:";
 const TZ = "Asia/Taipei";
 const MACROS = [
   { key: "carbs", label: "碳水", color: "#356fa8" },
@@ -43,7 +44,7 @@ function bindElements() {
     "bmrInput", "todayCalories", "calorieDiff", "todaySodium", "sodiumStatus",
     "aiSettingsToggle", "aiSettings", "apiKeyInput", "modelInput", "aiAdvice",
     "askAiButton", "selectedDateLabel", "datePickerButton", "dailySummary",
-    "logList", "addLogButton", "addCardButton", "foodCardList", "modalLayer"
+    "logList", "addLogButton", "importCardButton", "addCardButton", "foodCardList", "modalLayer"
   ].forEach((id) => {
     els[id] = document.getElementById(id);
   });
@@ -87,6 +88,7 @@ function bindEvents() {
   els.askAiButton.addEventListener("click", askAiAdvice);
   els.datePickerButton.addEventListener("click", openCalendarModal);
   els.addLogButton.addEventListener("click", openAddLogModal);
+  els.importCardButton.addEventListener("click", () => openImportCardModal());
   els.addCardButton.addEventListener("click", () => openCardForm());
 }
 
@@ -242,6 +244,7 @@ function renderLog() {
     const row = document.createElement("div");
     row.className = "log-row";
     row.innerHTML = `
+      <button class="row-copy" type="button">複製</button>
       <button class="row-delete" type="button">刪除</button>
       <button class="row-surface" type="button">
         <div class="row-title">
@@ -251,6 +254,7 @@ function renderLog() {
         ${nutriGrid(totals)}
       </button>
     `;
+    row.querySelector(".row-copy").addEventListener("click", () => copyCardCode(log.snapshot));
     row.querySelector(".row-delete").addEventListener("click", () => confirmDeleteLog(log.id));
     row.querySelector(".row-surface").addEventListener("click", () => openLogDetail(log.id));
     attachSwipe(row);
@@ -287,10 +291,12 @@ function renderCards() {
       ${card.note ? `<p class="empty-copy">${escapeHtml(card.note)}</p>` : ""}
       <div class="food-card-actions">
         <button class="secondary-button" type="button" data-edit>編輯</button>
+        <button class="secondary-button" type="button" data-copy>複製代碼</button>
         <button class="danger-button" type="button" data-delete>刪除</button>
       </div>
     `;
     item.querySelector("[data-edit]").addEventListener("click", () => openCardForm(card.id));
+    item.querySelector("[data-copy]").addEventListener("click", () => copyCardCode(card));
     item.querySelector("[data-delete]").addEventListener("click", () => confirmDeleteCard(card.id));
     els.foodCardList.append(item);
   });
@@ -346,7 +352,10 @@ function openAddLogModal() {
       <label>份數
         <input id="servingsInput" type="number" inputmode="decimal" min="0.1" step="0.1" value="1">
       </label>
-      <button id="quickAddCard" class="text-button" type="button">新增卡片</button>
+      <div class="modal-actions">
+        <button id="importCardInLog" class="text-button" type="button">輸入代碼</button>
+        <button id="quickAddCard" class="text-button" type="button">新增卡片</button>
+      </div>
     </div>
     <div class="choice-list" id="choiceList"></div>
   `;
@@ -375,6 +384,12 @@ function openAddLogModal() {
   wrapper.querySelector("#quickAddCard").addEventListener("click", () => {
     openCardForm(null, (card) => {
       addLogFromCard(card, 1);
+    });
+  });
+  wrapper.querySelector("#importCardInLog").addEventListener("click", () => {
+    openImportCardModal((card) => {
+      const servings = Math.max(0.1, Number(wrapper.querySelector("#servingsInput")?.value || 1));
+      addLogFromCard(card, servings);
     });
   });
 
@@ -436,6 +451,117 @@ function confirmDeleteCard(cardId) {
   state.cards = state.cards.filter((card) => card.id !== cardId);
   saveState();
   render();
+}
+
+function openImportCardModal(afterImport) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "modal-card form-stack";
+  wrapper.innerHTML = `
+    <div class="modal-head">
+      <h2>輸入卡片代碼</h2>
+      <button class="icon-button" type="button" data-close-modal aria-label="關閉" title="關閉">×</button>
+    </div>
+    <label>卡片代碼
+      <textarea id="cardCodeInput" rows="5" placeholder="貼上 NUTRI: 開頭的代碼"></textarea>
+    </label>
+    <div id="cardCodePreview" class="import-preview empty-state">貼上代碼後先按檢查</div>
+    <div class="modal-button-row">
+      <button id="previewCardCode" class="secondary-button" type="button">檢查</button>
+      <button id="saveImportedCard" class="primary-button compact" type="button" disabled>新增卡片</button>
+    </div>
+  `;
+
+  let parsedCard = null;
+  const input = wrapper.querySelector("#cardCodeInput");
+  const preview = wrapper.querySelector("#cardCodePreview");
+  const saveButton = wrapper.querySelector("#saveImportedCard");
+
+  const previewCode = () => {
+    try {
+      parsedCard = parseCardCode(input.value);
+      preview.className = "import-preview";
+      preview.innerHTML = `
+        <strong>${escapeHtml(parsedCard.name)}</strong>
+        ${nutriGrid(parsedCard)}
+        ${parsedCard.note ? `<p class="empty-copy">${escapeHtml(parsedCard.note)}</p>` : ""}
+      `;
+      saveButton.disabled = false;
+    } catch (error) {
+      parsedCard = null;
+      preview.className = "import-preview empty-state";
+      preview.textContent = error.message;
+      saveButton.disabled = true;
+    }
+  };
+
+  wrapper.querySelector("#previewCardCode").addEventListener("click", previewCode);
+  input.addEventListener("input", () => {
+    parsedCard = null;
+    saveButton.disabled = true;
+  });
+  saveButton.addEventListener("click", () => {
+    if (!parsedCard) previewCode();
+    if (!parsedCard) return;
+    const card = { ...parsedCard, id: crypto.randomUUID() };
+    state.cards.push(card);
+    saveState();
+    closeModal();
+    render();
+    if (afterImport) afterImport(card);
+  });
+
+  openModal(wrapper);
+}
+
+async function copyCardCode(card) {
+  const code = createCardCode(card);
+  try {
+    await navigator.clipboard.writeText(code);
+    alert("已複製卡片代碼");
+  } catch {
+    prompt("請複製這段卡片代碼", code);
+  }
+}
+
+function createCardCode(card) {
+  const payload = {
+    v: 1,
+    name: String(card.name || "").trim(),
+    calories: Number(card.calories || 0),
+    carbs: Number(card.carbs || 0),
+    protein: Number(card.protein || 0),
+    fat: Number(card.fat || 0),
+    sodium: Number(card.sodium || 0),
+    note: String(card.note || "").trim()
+  };
+  return `${CARD_CODE_PREFIX}${encodeBase64Url(JSON.stringify(payload))}`;
+}
+
+function parseCardCode(code) {
+  const normalized = String(code || "").trim();
+  if (!normalized.startsWith(CARD_CODE_PREFIX)) {
+    throw new Error("代碼格式不正確");
+  }
+  let payload;
+  try {
+    payload = JSON.parse(decodeBase64Url(normalized.slice(CARD_CODE_PREFIX.length)));
+  } catch {
+    throw new Error("代碼內容無法讀取");
+  }
+  const card = {
+    name: String(payload.name || "").trim(),
+    calories: Number(payload.calories || 0),
+    carbs: Number(payload.carbs || 0),
+    protein: Number(payload.protein || 0),
+    fat: Number(payload.fat || 0),
+    sodium: Number(payload.sodium || 0),
+    note: String(payload.note || "").trim()
+  };
+  if (!card.name) throw new Error("代碼缺少品項名稱");
+  if ([card.calories, card.carbs, card.protein, card.fat, card.sodium].some((value) => !Number.isFinite(value) || value < 0)) {
+    throw new Error("代碼內的營養數值不正確");
+  }
+  return card;
 }
 
 function openCalendarModal() {
@@ -695,9 +821,9 @@ function attachSwipe(row) {
 
   surface.addEventListener("pointermove", (event) => {
     if (!tracking) return;
-    currentX = Math.min(0, event.clientX - startX);
+    currentX = event.clientX - startX;
     if (Math.abs(currentX) > 8) {
-      surface.style.transform = `translateX(${Math.max(currentX, -92)}px)`;
+      surface.style.transform = `translateX(${clamp(currentX, -92, 92)}px)`;
     }
   });
 
@@ -705,7 +831,8 @@ function attachSwipe(row) {
     if (!tracking) return;
     tracking = false;
     surface.style.transform = "";
-    row.classList.toggle("is-open", currentX < -44);
+    row.classList.toggle("is-delete-open", currentX < -44);
+    row.classList.toggle("is-copy-open", currentX > 44);
   };
   surface.addEventListener("pointerup", end);
   surface.addEventListener("pointercancel", end);
@@ -868,4 +995,20 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function encodeBase64Url(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeBase64Url(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
 }

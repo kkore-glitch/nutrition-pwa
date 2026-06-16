@@ -7,7 +7,7 @@
     <meta name="description" content="手機用飲食營養紀錄 PWA">
     <title>飲控幫手</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./src/styles.css?v=7">
+    <link rel="stylesheet" href="./src/styles.css?v=8">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -104,7 +104,10 @@
                 <h2>卡片區</h2>
                 <p>常吃品項與營養成分</p>
               </div>
-              <button id="addCardButton" class="primary-button compact" type="button">新增卡片</button>
+              <div class="head-actions">
+                <button id="importCardButton" class="secondary-button compact" type="button">輸入代碼</button>
+                <button id="addCardButton" class="primary-button compact" type="button">新增卡片</button>
+              </div>
             </div>
             <div id="foodCardList" class="food-card-list"></div>
           </section>
@@ -153,6 +156,6 @@
         <button class="primary-button" type="submit">儲存</button>
       </form>
     </template>
-    <script src="./src/app.js?v=7" defer></script>
+    <script src="./src/app.js?v=8" defer></script>
   </body>
 </html>
