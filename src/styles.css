@@ -650,6 +650,7 @@ textarea:focus {
   grid-template-columns: 1fr 96px;
   gap: 10px;
   align-items: end;
+  margin-bottom: 14px;
 }
 
 @media (min-width: 640px) {

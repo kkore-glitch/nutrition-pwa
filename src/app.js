@@ -22,6 +22,11 @@ const defaultState = {
 };
 
 let state = loadState();
+let activeTaiwanDate = taiwanYmd(new Date());
+if (state.selectedDate !== activeTaiwanDate) {
+  state.selectedDate = activeTaiwanDate;
+  saveState();
+}
 let calendarCursor = firstOfMonth(parseYmd(state.selectedDate));
 
 const els = {};
@@ -35,7 +40,7 @@ function bindElements() {
   [
     "taiwanClock", "weekRange", "themeToggle", "emptyWeekNotice",
     "macroChart", "macroStats", "targetCarbs", "targetProtein", "targetFat",
-    "bmrInput", "avgCalories", "calorieDiff", "todaySodium", "sodiumStatus",
+    "bmrInput", "todayCalories", "calorieDiff", "todaySodium", "sodiumStatus",
     "aiSettingsToggle", "aiSettings", "apiKeyInput", "modelInput", "aiAdvice",
     "askAiButton", "selectedDateLabel", "datePickerButton", "dailySummary",
     "logList", "addLogButton", "addCardButton", "foodCardList", "modalLayer"
@@ -134,19 +139,19 @@ function renderOverview() {
   drawMacroChart(totals, hasData, avg);
   renderMacroStats(totals, hasData);
 
-  els.avgCalories.textContent = `${round(avg, 0)} kcal`;
+  const todayLogs = state.logs.filter((log) => log.date === taiwanYmd(new Date()));
+  const todayTotals = totalLogs(todayLogs);
+  els.todayCalories.textContent = `${round(todayTotals.calories, 0)} kcal`;
 
   const bmr = Number(state.settings.bmr || 0);
-  const diff = avg - bmr;
+  const diff = todayTotals.calories - bmr;
   els.calorieDiff.textContent = bmr ? `差值 ${signed(round(diff, 0))} kcal` : "輸入基礎代謝率後計算差值";
   els.calorieDiff.classList.toggle("over", bmr > 0 && diff > 0);
   els.calorieDiff.classList.toggle("under", bmr > 0 && diff < 0);
 
-  const todayLogs = state.logs.filter((log) => log.date === taiwanYmd(new Date()));
-  const sodium = totalLogs(todayLogs).sodium;
-  els.todaySodium.textContent = `${round(sodium, 0)} mg`;
-  els.sodiumStatus.textContent = sodium > 2000 ? "超過 2000 mg，建議攝取量 2400/日" : "建議攝取量 2400/日";
-  els.sodiumStatus.classList.toggle("over", sodium > 2000);
+  els.todaySodium.textContent = `${round(todayTotals.sodium, 0)} mg`;
+  els.sodiumStatus.textContent = todayTotals.sodium > 2000 ? "超過 2000 mg，建議攝取量 2400/日" : "建議攝取量 2400/日";
+  els.sodiumStatus.classList.toggle("over", todayTotals.sodium > 2000);
 }
 
 function renderMacroStats(totals, hasData) {
@@ -506,19 +511,17 @@ async function askAiAdvice() {
     return;
   }
 
-  const yesterday = addDays(parseYmd(taiwanYmd(new Date())), -1);
-  const yesterdayYmd = formatLocalYmd(yesterday);
-  const analysisDate = chooseAnalysisDate(yesterdayYmd);
-  const analysisLogs = state.logs.filter((log) => log.date === analysisDate);
-  if (!analysisLogs.length) {
-    els.aiAdvice.value = "目前沒有可分析的飲食紀錄。";
+  const analysisDate = taiwanYmd(new Date());
+  const todayLogs = state.logs.filter((log) => log.date === analysisDate);
+  if (!todayLogs.length) {
+    els.aiAdvice.value = "本日還沒有飲食紀錄。";
     return;
   }
 
   const week = getWeekRange(new Date());
   const weekLogs = state.logs.filter((log) => log.date >= week.start && log.date <= week.end);
   const weekTotals = totalLogs(weekLogs);
-  const analysisTotals = totalLogs(analysisLogs);
+  const todayTotals = totalLogs(todayLogs);
   const targetRatio = {
     carbs: Number(state.settings.targetCarbs || 0),
     protein: Number(state.settings.targetProtein || 0),
@@ -529,18 +532,26 @@ async function askAiAdvice() {
     bmr: Number(state.settings.bmr || 0),
     weekRange: week,
     overview: buildNutritionOverview(weekTotals, weekLogs, targetRatio),
-    analysisDay: {
+    today: {
       date: analysisDate,
-      basis: analysisDate === yesterdayYmd ? "previous_day" : "selected_or_latest_recorded_day",
-      totals: analysisTotals,
-      macroRatio: macroRatio(analysisTotals),
-      macroStatus: macroStatus(macroRatio(analysisTotals), targetRatio),
-      foods: analysisLogs.map((log) => ({
+      totals: todayTotals,
+      macroRatio: macroRatio(todayTotals),
+      macroStatus: macroStatus(macroRatio(todayTotals), targetRatio),
+      calorieStatus: calorieStatus(todayTotals.calories, Number(state.settings.bmr || 0)),
+      foods: todayLogs.map((log) => ({
         name: log.snapshot.name,
         servings: log.servings,
         nutrition: scaledSnapshot(log)
       }))
-    }
+    },
+    userFoodCards: state.cards.map((card) => ({
+      name: card.name,
+      calories: Number(card.calories || 0),
+      carbs: Number(card.carbs || 0),
+      protein: Number(card.protein || 0),
+      fat: Number(card.fat || 0),
+      sodium: Number(card.sodium || 0)
+    }))
   };
 
   els.askAiButton.disabled = true;
@@ -560,11 +571,11 @@ async function askAiAdvice() {
         input: [
           {
             role: "developer",
-            content: "你是飲食紀錄分析助手。只根據使用者提供的營養紀錄回答。用繁體中文，150字內，語氣理性。回覆順序固定：第一句先判讀 overview 的整體比例、熱量差值與當日鈉；第二句用 analysisDay 當例子提出一個具體調整或維持建議。鈉只可引用 overview.sodiumToday，資料中沒有週鈉合計。若 overview 某項偏高，但 analysisDay 同項沒有偏高，不要硬把當日食物當原因；改說需要再觀察其他日期。不要給醫療診斷。"
+            content: "你是飲食紀錄分析助手。只根據使用者提供的本日飲食與卡片資料回答。用繁體中文，150字內，語氣理性。先判讀 today 的熱量、三大營養比例與鈉，再給具體建議。若 today.calorieStatus.status 是 low，請依 userFoodCards 中使用者常吃項目，建議適量補足；若沒有合適卡片，再給一般食物方向。鈉只可引用 today.totals.sodium。不要給醫療診斷。"
           },
           {
             role: "user",
-            content: `請根據以下資料產生飲控建議。請先看整體概覽，再用分析日食物舉例：${JSON.stringify(context)}`
+            content: `請根據以下本日資料產生飲控建議：${JSON.stringify(context)}`
           }
         ]
       })
@@ -609,6 +620,17 @@ function buildNutritionOverview(totals, logs, targetRatio) {
   };
 }
 
+function calorieStatus(calories, bmr) {
+  if (!bmr) return { status: "unknown", calories, target: null, diff: null };
+  const diff = calories - bmr;
+  return {
+    status: diff < 0 ? "low" : diff > 0 ? "high" : "met",
+    calories,
+    target: bmr,
+    diff
+  };
+}
+
 function macroRatio(totals) {
   const total = MACROS.reduce((sum, macro) => sum + Number(totals[macro.key] || 0), 0);
   if (!total) return { carbs: 0, protein: 0, fat: 0 };
@@ -626,12 +648,6 @@ function macroStatus(ratio, targetRatio) {
     const status = actual > target ? "high" : actual < target ? "low" : "met";
     return [macro.key, { actual, target, status }];
   }));
-}
-
-function chooseAnalysisDate(preferredDate) {
-  if (state.logs.some((log) => log.date === preferredDate)) return preferredDate;
-  if (state.logs.some((log) => log.date === state.selectedDate)) return state.selectedDate;
-  return [...new Set(state.logs.map((log) => log.date))].sort().pop() || preferredDate;
 }
 
 function extractOutputText(data) {
@@ -748,6 +764,15 @@ function saveState() {
 }
 
 function tickClock() {
+  const today = taiwanYmd(new Date());
+  if (today !== activeTaiwanDate) {
+    activeTaiwanDate = today;
+    state.selectedDate = today;
+    calendarCursor = firstOfMonth(parseYmd(today));
+    saveState();
+    render();
+  }
+
   els.taiwanClock.textContent = new Intl.DateTimeFormat("zh-TW", {
     timeZone: TZ,
     month: "2-digit",

@@ -7,7 +7,7 @@
     <meta name="description" content="手機用飲食營養紀錄 PWA">
     <title>飲控幫手</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./src/styles.css?v=5">
+    <link rel="stylesheet" href="./src/styles.css?v=7">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -22,6 +22,22 @@
       <main>
         <section id="tab-overview" class="tab-panel is-active" aria-labelledby="nav-overview">
           <div id="emptyWeekNotice" class="empty-banner is-hidden">沒有資料</div>
+
+          <section class="panel metric-grid">
+            <div class="metric-card">
+              <h2>本日攝取熱量</h2>
+              <strong id="todayCalories">0 kcal</strong>
+              <label>基礎代謝率
+                <input id="bmrInput" type="number" inputmode="decimal" min="0" step="10" placeholder="例如 1500">
+              </label>
+              <p id="calorieDiff" class="metric-note">差值 0 kcal</p>
+            </div>
+            <div class="metric-card">
+              <h2>本日鈉攝取</h2>
+              <strong id="todaySodium">0 mg</strong>
+              <p id="sodiumStatus" class="metric-note">建議攝取量 2400/日</p>
+            </div>
+          </section>
 
           <section class="panel macro-panel">
             <div class="panel-head">
@@ -47,27 +63,11 @@
             <div id="macroStats" class="macro-stats"></div>
           </section>
 
-          <section class="panel metric-grid">
-            <div class="metric-card">
-              <h2>平均每日總熱量</h2>
-              <strong id="avgCalories">0 kcal</strong>
-              <label>基礎代謝率
-                <input id="bmrInput" type="number" inputmode="decimal" min="0" step="10" placeholder="例如 1500">
-              </label>
-              <p id="calorieDiff" class="metric-note">差值 0 kcal</p>
-            </div>
-            <div class="metric-card">
-              <h2>當日鈉含量</h2>
-              <strong id="todaySodium">0 mg</strong>
-              <p id="sodiumStatus" class="metric-note">建議攝取量 2400/日</p>
-            </div>
-          </section>
-
           <section class="panel ai-panel">
             <div class="panel-head">
               <div>
                 <h2>AI 建言</h2>
-                <p>依前一天紀錄與本週目標產生簡短建議</p>
+                <p>依本日紀錄與目前目標產生簡短建議</p>
               </div>
               <button id="aiSettingsToggle" class="text-button" type="button">API 設定</button>
             </div>
@@ -153,6 +153,6 @@
         <button class="primary-button" type="submit">儲存</button>
       </form>
     </template>
-    <script src="./src/app.js?v=5" defer></script>
+    <script src="./src/app.js?v=7" defer></script>
   </body>
 </html>
