@@ -61,7 +61,14 @@ function initApp() {
   render();
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register("./sw.js").then((registration) => {
+      registration.update().catch(() => {});
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener("message", (event) => {
+      if (event.data?.type === "CACHE_UPDATED") {
+        window.location.reload();
+      }
+    });
   }
 }
 
