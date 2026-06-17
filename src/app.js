@@ -19,6 +19,7 @@ const defaultState = {
   },
   cards: [],
   logs: [],
+  completedDates: [],
   selectedDate: taiwanYmd(new Date())
 };
 
@@ -45,7 +46,7 @@ function bindElements() {
     "bmrInput", "macroCaloriesTitle", "macroCalories", "calorieDiff", "macroSodiumTitle", "macroSodium", "sodiumStatus",
     "macroDailyButton", "macroWeeklyButton",
     "aiSettingsToggle", "aiSettings", "apiKeyInput", "modelInput", "aiAdvice",
-    "askAiButton", "selectedDateLabel", "datePickerButton", "dailySummary",
+    "askAiButton", "selectedDateLabel", "datePickerButton", "completeDayButton", "dailySummary",
     "logList", "addLogButton", "importCardButton", "addCardButton", "foodCardList", "modalLayer"
   ].forEach((id) => {
     els[id] = document.getElementById(id);
@@ -56,6 +57,7 @@ function initApp() {
   document.documentElement.dataset.theme = state.settings.theme;
   fillSettings();
   bindEvents();
+  guardViewportScale();
   tickClock();
   setInterval(tickClock, 1000);
   render();
@@ -102,9 +104,25 @@ function bindEvents() {
   });
   els.askAiButton.addEventListener("click", askAiAdvice);
   els.datePickerButton.addEventListener("click", openCalendarModal);
+  els.completeDayButton.addEventListener("click", toggleSelectedDateComplete);
   els.addLogButton.addEventListener("click", openAddLogModal);
   els.importCardButton.addEventListener("click", () => openImportCardModal());
   els.addCardButton.addEventListener("click", () => openCardForm());
+}
+
+function guardViewportScale() {
+  let lastTouchEnd = 0;
+  document.addEventListener("gesturestart", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("gesturechange", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("gestureend", (event) => event.preventDefault(), { passive: false });
+  document.addEventListener("touchmove", (event) => {
+    if (event.scale && event.scale !== 1) event.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchend", (event) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) event.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
 }
 
 function idToSetting(id) {
@@ -173,11 +191,10 @@ function renderOverview() {
 
 function getMacroViewData(todayLogs, weekLogs) {
   if (macroView === "weekly") {
-    const totals = totalLogs(weekLogs);
-    const recordedDays = Math.max(new Set(weekLogs.map((log) => log.date)).size, 1);
+    const weeklyAverage = getCompletedWeekAverage();
     return {
-      hasData: weekLogs.length > 0,
-      totals: divideTotals(totals, recordedDays),
+      hasData: weeklyAverage.completedDates.length > 0,
+      totals: weeklyAverage.totals,
       calorieTitle: "本週平均熱量",
       sodiumTitle: "本週平均鈉攝取"
     };
@@ -193,6 +210,25 @@ function getMacroViewData(todayLogs, weekLogs) {
 
 function divideTotals(totals, divisor) {
   return Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, value / divisor]));
+}
+
+function getCompletedWeekAverage() {
+  const today = taiwanYmd(new Date());
+  const completedDates = [...new Set(state.completedDates || [])]
+    .filter((date) => date <= today)
+    .sort();
+  const endDate = completedDates[completedDates.length - 1];
+  if (!endDate) {
+    return { totals: totalLogs([]), completedDates: [] };
+  }
+
+  const startDate = formatLocalYmd(addDays(parseYmd(endDate), -6));
+  const windowDates = completedDates.filter((date) => date >= startDate && date <= endDate);
+  const logs = state.logs.filter((log) => windowDates.includes(log.date));
+  return {
+    totals: divideTotals(totalLogs(logs), windowDates.length),
+    completedDates: windowDates
+  };
 }
 
 function renderMacroStats(totals, hasData) {
@@ -270,6 +306,7 @@ function renderLog() {
   const selected = state.selectedDate;
   const logs = state.logs.filter((log) => log.date === selected).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   els.selectedDateLabel.textContent = formatDateLong(selected);
+  renderCompleteDayButton();
   renderDailySummary(logs);
   els.logList.innerHTML = "";
 
@@ -299,6 +336,28 @@ function renderLog() {
     attachSwipe(row);
     els.logList.append(row);
   });
+}
+
+function renderCompleteDayButton() {
+  const isComplete = isDateComplete(state.selectedDate);
+  els.completeDayButton.classList.toggle("is-complete", isComplete);
+  els.completeDayButton.textContent = isComplete ? "已完整記錄" : "完整記錄";
+}
+
+function toggleSelectedDateComplete() {
+  const dates = new Set(state.completedDates || []);
+  if (dates.has(state.selectedDate)) {
+    dates.delete(state.selectedDate);
+  } else {
+    dates.add(state.selectedDate);
+  }
+  state.completedDates = [...dates].sort();
+  saveState();
+  render();
+}
+
+function isDateComplete(date) {
+  return (state.completedDates || []).includes(date);
 }
 
 function renderDailySummary(logs) {
@@ -563,27 +622,31 @@ async function copyCardCode(card) {
 }
 
 function createCardCode(card) {
-  const payload = {
-    v: 1,
-    name: String(card.name || "").trim(),
-    calories: Number(card.calories || 0),
-    carbs: Number(card.carbs || 0),
-    protein: Number(card.protein || 0),
-    fat: Number(card.fat || 0),
-    sodium: Number(card.sodium || 0),
-    note: String(card.note || "").trim()
-  };
-  return `${CARD_CODE_PREFIX}${encodeBase64Url(JSON.stringify(payload))}`;
+  const name = String(card.name || "").trim();
+  const payload = [
+    2,
+    name,
+    Number(card.calories || 0),
+    Number(card.carbs || 0),
+    Number(card.protein || 0),
+    Number(card.fat || 0),
+    Number(card.sodium || 0),
+    String(card.note || "").trim()
+  ];
+  return `${CARD_CODE_PREFIX}${codeLabel(name)}:${encodeBase64Url(JSON.stringify(payload))}`;
 }
 
 function parseCardCode(code) {
   const normalized = String(code || "").trim();
-  if (!normalized.startsWith(CARD_CODE_PREFIX)) {
+  const colonIndex = normalized.indexOf(":");
+  if (colonIndex < 0 || normalized.slice(0, colonIndex).toUpperCase() !== CARD_CODE_PREFIX.slice(0, -1)) {
     throw new Error("代碼格式不正確");
   }
   let payload;
   try {
-    payload = JSON.parse(decodeBase64Url(normalized.slice(CARD_CODE_PREFIX.length)));
+    const rawBody = normalized.slice(colonIndex + 1).trim();
+    const body = rawBody.includes(":") ? rawBody.slice(rawBody.lastIndexOf(":") + 1) : rawBody;
+    payload = normalizeCardPayload(JSON.parse(decodeBase64Url(body)));
   } catch {
     throw new Error("代碼內容無法讀取");
   }
@@ -601,6 +664,26 @@ function parseCardCode(code) {
     throw new Error("代碼內的營養數值不正確");
   }
   return card;
+}
+
+function normalizeCardPayload(payload) {
+  if (Array.isArray(payload)) {
+    return {
+      v: payload[0],
+      name: payload[1],
+      calories: payload[2],
+      carbs: payload[3],
+      protein: payload[4],
+      fat: payload[5],
+      sodium: payload[6],
+      note: payload[7]
+    };
+  }
+  return payload;
+}
+
+function codeLabel(name) {
+  return String(name || "卡片").replace(/[:\r\n]+/g, "-").trim().slice(0, 28);
 }
 
 function openCalendarModal() {
@@ -918,7 +1001,8 @@ function loadState() {
       settings: { ...defaultState.settings, ...(saved?.settings || {}) },
       selectedDate: saved?.selectedDate || defaultState.selectedDate,
       cards: Array.isArray(saved?.cards) ? saved.cards : [],
-      logs: Array.isArray(saved?.logs) ? saved.logs : []
+      logs: Array.isArray(saved?.logs) ? saved.logs : [],
+      completedDates: Array.isArray(saved?.completedDates) ? saved.completedDates : []
     };
   } catch {
     return structuredClone(defaultState);

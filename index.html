@@ -2,12 +2,12 @@
 <html lang="zh-Hant">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#f7f4ef">
     <meta name="description" content="手機用飲食營養紀錄 PWA">
     <title>飲控幫手</title>
     <link rel="manifest" href="./manifest.webmanifest">
-    <link rel="stylesheet" href="./src/styles.css?v=10">
+    <link rel="stylesheet" href="./src/styles.css?v=11">
   </head>
   <body>
     <div id="app" class="app-shell">
@@ -95,6 +95,7 @@
               <span id="selectedDateLabel">今天</span>
               <small>點選日期</small>
             </button>
+            <button id="completeDayButton" class="complete-day-button" type="button">完整記錄</button>
             <div id="dailySummary" class="daily-summary"></div>
             <div id="logList" class="log-list"></div>
           </section>
@@ -159,6 +160,6 @@
         <button class="primary-button" type="submit">儲存</button>
       </form>
     </template>
-    <script src="./src/app.js?v=10" defer></script>
+    <script src="./src/app.js?v=11" defer></script>
   </body>
 </html>
